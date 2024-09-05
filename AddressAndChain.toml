@@ -1,0 +1,18 @@
+[[addresses]]
+address = "tb1qfmhntdfgyrgcpcys54dxhahzj5dxm5ea8kv53f"
+rpc_url = "Bitcoin"
+chain = "Bitcoin"
+alert_balance = 456
+
+[[addresses]]
+address = "0xC770da3eF22877d0B39C456Cb3e11e3719C4B527"
+rpc_url = "https://arbitrum.gateway.tenderly.co/<API_KEY_1>"
+chain="Arbitrum"
+alert_balance = 900
+
+[[addresses]]
+address = "0xC770da3eF22877d0B39C456Cb3e11e3719C4B527"
+rpc_url = "https://sepolia.gateway.tenderly.co/<API_KEY_2>"
+chain="Sepolia"
+alert_balance = 654
+
