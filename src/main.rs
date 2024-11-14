@@ -74,11 +74,11 @@ async fn ping() {
         match detail.chain.as_str() {
             "Bitcoin" => match get_bitcoin_balance(client, &address).await {
                 Ok(bitcoin_balance) => {
-                    info!("Bitcoin Balance: {}", format_crypto_balance(bitcoin_balance, true));
+                    info!("Bitcoin Balance: {}", format_crypto_balance(bitcoin_balance, "Bitcoin"));
                     if bitcoin_balance < detail.alert_balance {
                         send_result(&format!(
                             "Bitcoin balance low: {} Address: {}", 
-                            format_crypto_balance(bitcoin_balance, true),
+                            format_crypto_balance(bitcoin_balance, "Bitcoin"),
                             address
                         )).await;
                     }
@@ -90,15 +90,15 @@ async fn ping() {
             chain => match get_evm_balance(&address, &detail.rpc_url).await {
                 Ok(evm_balance) => {
                     info!("{} Balance: {} Address: {}", 
-                        chain, 
-                        format_crypto_balance(evm_balance, false),
+                        chain,
+                        format_crypto_balance(evm_balance, chain),
                         address
                     );
                     if evm_balance < detail.alert_balance {
                         send_result(&format!(
                             "{} Balance low: {} Address: {}", 
                             chain,
-                            format_crypto_balance(evm_balance, false),
+                            format_crypto_balance(evm_balance, chain),
                             address
                         )).await;
                     }
@@ -153,14 +153,24 @@ async fn get_bitcoin_balance(client: reqwest::Client, address: &str) -> Result<u
 const SATOSHI_TO_BTC: f64 = 100_000_000.0; 
 const WEI_TO_ETH: f64 = 1_000_000_000_000_000_000.0; 
 
-fn format_crypto_balance(balance: u64, is_bitcoin: bool) -> String {
-    let converted_balance = if is_bitcoin {
-        balance as f64 / SATOSHI_TO_BTC
-    } else {
-        balance as f64 / WEI_TO_ETH
+fn get_conversion_factor(chain: &str) -> f64 {
+    match chain {
+        "BTC" | "Bitcoin" => SATOSHI_TO_BTC,
+        "ETH" | "Ethereum" | "Arbitrum" | "Sepolia" | "Base" => WEI_TO_ETH,
+        _ => WEI_TO_ETH
+    }
+}
+
+fn format_crypto_balance(balance: u64, chain: &str) -> String {
+    let conversion_factor = get_conversion_factor(chain);
+    let converted_balance = balance as f64 / conversion_factor;
+    
+    let symbol = match chain {
+        "BTC" | "Bitcoin" => "BTC",
+        _ => "ETH"
     };
     
-    format!("{:.4} {}", converted_balance, if is_bitcoin { "BTC" } else { "ETH" })
+    format!("{:.4} {}", converted_balance, symbol)
 }
 
 async fn send_result(data: &str) {
