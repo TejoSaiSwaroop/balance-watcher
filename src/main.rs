@@ -43,7 +43,7 @@ struct BitcoinDetails {
 }
 
 fn get_config() -> Config {
-    let mut file = File::open("AddressAndChain.toml").unwrap();
+    let mut file = File::open("AddressChainAndBalance.toml").unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     let config: Config = toml::from_str(&contents).unwrap();
@@ -61,7 +61,7 @@ async fn main() {
     loop {
         info!("*************************");
         ping().await;
-        tokio::time::sleep(Duration::from_secs(30)).await;
+        tokio::time::sleep(Duration::from_secs(60)).await;
     }
 }
 
@@ -74,9 +74,13 @@ async fn ping() {
         match detail.chain.as_str() {
             "Bitcoin" => match get_bitcoin_balance(client, &address).await {
                 Ok(bitcoin_balance) => {
-                    info!("Bitcoin Balance: {}", bitcoin_balance);
+                    info!("Bitcoin Balance: {}", format_crypto_balance(bitcoin_balance, "Bitcoin"));
                     if bitcoin_balance < detail.alert_balance {
-                        send_result(&format!("Bitcoin: {}", bitcoin_balance)).await;
+                        send_result(&format!(
+                            "Bitcoin balance low: {} Address: {}", 
+                            format_crypto_balance(bitcoin_balance, "Bitcoin"),
+                            address
+                        )).await;
                     }
                 }
                 Err(e) => {
@@ -85,13 +89,22 @@ async fn ping() {
             },
             chain => match get_evm_balance(&address, &detail.rpc_url).await {
                 Ok(evm_balance) => {
-                    info!("{} Balance: {}", chain, evm_balance);
+                    info!("{} Balance: {} Address: {}", 
+                        chain,
+                        format_crypto_balance(evm_balance, chain),
+                        address
+                    );
                     if evm_balance < detail.alert_balance {
-                        send_result(&format!("{} : {}", chain, evm_balance)).await;
+                        send_result(&format!(
+                            "{} Balance low: {} Address: {}", 
+                            chain,
+                            format_crypto_balance(evm_balance, chain),
+                            address
+                        )).await;
                     }
                 }
                 Err(e) => {
-                    error!("Failed to fetch {} balance: {}", chain, e);
+                    error!("Failed to fetch {} balance: {} address: {}", chain, e, address);
                 }
             },
         }
@@ -137,6 +150,29 @@ async fn get_bitcoin_balance(client: reqwest::Client, address: &str) -> Result<u
     Ok(val.chain_stats.funded_txo_sum - val.chain_stats.spent_txo_sum)
 }
 
+const SATOSHI_TO_BTC: f64 = 100_000_000.0; 
+const WEI_TO_ETH: f64 = 1_000_000_000_000_000_000.0; 
+
+fn get_conversion_factor(chain: &str) -> f64 {
+    match chain {
+        "BTC" | "Bitcoin" => SATOSHI_TO_BTC,
+        "ETH" | "Ethereum" | "Arbitrum" | "Sepolia" | "Base" => WEI_TO_ETH,
+        _ => WEI_TO_ETH
+    }
+}
+
+fn format_crypto_balance(balance: u64, chain: &str) -> String {
+    let conversion_factor = get_conversion_factor(chain);
+    let converted_balance = balance as f64 / conversion_factor;
+    
+    let symbol = match chain {
+        "BTC" | "Bitcoin" => "BTC",
+        _ => "ETH"
+    };
+    
+    format!("{:.4} {}", converted_balance, symbol)
+}
+
 async fn send_result(data: &str) {
     let http = Http::new("");
     let webhook = Webhook::from_url(&http, &env::var("WEBHOOK").expect("Should be set"))
@@ -147,7 +183,7 @@ async fn send_result(data: &str) {
 
     let builder = ExecuteWebhook::new()
         .content(formatted_data)
-        .username("Account Manager");
+        .username("Balance Watcher");
 
     webhook
         .execute(&http, false, builder)
