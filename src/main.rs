@@ -43,7 +43,7 @@ struct BitcoinDetails {
 }
 
 fn get_config() -> Config {
-    let mut file = File::open("AddressChainAndBalance.toml").unwrap();
+    let mut file = File::open("AddressAndChain.toml").unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     let config: Config = toml::from_str(&contents).unwrap();
