@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balance Watcher Configuration</title>
+    <style>
+        body {
+            font-family: Poppins,sans-serif;
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            margin: 0 auto;
+
+        }
+        label {
+            border-radius: 5px;
+            margin-bottom: 5px;
+            padding: 5px;
+        }
+        input, select {
+            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Configure Balance Watcher</h1>
+    <form action="/submit" method="post">
+        <label for="webhook_url">Discord Webhook URL:</label><br>
+        <input type="text" id="webhook_url" name="webhook_url" required><br><br>
+        <label for="network">Select Network:</label><br>
+        <select id="network" name="network" required>
+            {{range $key, $value := .}}
+            <option value="{{$key}}">{{$key}}</option>
+            {{end}}
+        </select><br><br>
+        <label for="rpc_url">RPC URL:</label><br>
+        <input type="text" id="rpc_url" name="rpc_url" required><br><br>
+        <label for="address">Wallet Address:</label><br>
+        <input type="text" id="address" name="address" required><br><br>
+        <label for="alert_balance">Alert Balance:</label><br>
+        <input type="number" id="alert_balance" name="alert_balance" required><br><br>
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
