@@ -50,14 +50,41 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Maximum size for form data
+	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
+
 	webhookUrl := r.FormValue("webhook_url")
 	network := r.FormValue("network")
 	rpcUrl := r.FormValue("rpc_url")
 	address := r.FormValue("address")
 	alertBalanceStr := r.FormValue("alert_balance")
 
+	// Validate webhook URL
+	if _, err := url.ParseRequestURI(webhookUrl); err != nil {
+		http.Error(w, "Invalid webhook URL", http.StatusBadRequest)
+		return
+	}
+
+	// Validate network
+	if _, valid := networks[network]; !valid {
+		http.Error(w, "Invalid network", http.StatusBadRequest)
+		return
+	}
+
+	// Validate RPC URL
+	if _, err := url.ParseRequestURI(rpcUrl); err != nil {
+		http.Error(w, "Invalid RPC URL", http.StatusBadRequest)
+		return
+	}
+
+	// Validate address format
+	if !regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`).MatchString(address) {
+		http.Error(w, "Invalid address format", http.StatusBadRequest)
+		return
+	}
+
 	alertBalance, err := strconv.Atoi(alertBalanceStr)
-	if err != nil {
+	if err != nil || alertBalance <= 0 {
 		http.Error(w, "Invalid alert balance", http.StatusBadRequest)
 		return
 	}
