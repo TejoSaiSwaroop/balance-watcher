@@ -24,14 +24,45 @@ var networks = map[string]string{
 }
 
 func main() {
+	// Add security headers middleware
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+	})
+
 	http.HandleFunc("/", formHandler)
 	http.HandleFunc("/submit", submitHandler)
 	http.HandleFunc("/start", startHandler)
 
 	log.Println("Listening on :8080...")
-	err := http.ListenAndServe(":8080", nil)
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	
+	// Graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt)
+		<-sigChan
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("HTTP server Shutdown: %v", err)
+		}
+	}()
+
+	err := srv.ListenAndServe()
 	if err != nil {
-		log.Fatal(err)
+		if err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
 	}
 }
 
