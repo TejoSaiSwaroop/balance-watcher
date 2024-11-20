@@ -131,6 +131,9 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/start", http.StatusSeeOther)
 }
 
+var rustAppCtx context.Context
+var rustAppCancel context.CancelFunc
+
 func startHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("static/start.html")
 	if err != nil {
@@ -139,7 +142,13 @@ func startHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tmpl.Execute(w, nil)
 
-	go startRustApp()
+	// Cancel previous instance if exists
+	if rustAppCancel != nil {
+		rustAppCancel()
+	}
+	
+	rustAppCtx, rustAppCancel = context.WithCancel(context.Background())
+	go startRustApp(rustAppCtx)
 }
 
 var configMutex sync.Mutex
