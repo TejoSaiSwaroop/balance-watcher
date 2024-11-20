@@ -207,18 +207,43 @@ func updateEnv(webhookUrl string) {
 	log.Printf("Updated .env with webhookUrl=%s", webhookUrl)
 }
 
-func startRustApp() {
+func startRustApp(ctx context.Context) {
 	log.Println("Starting Rust application...")
-	cmd := exec.Command("cargo", "run", "--release")
+	cmd := exec.CommandContext(ctx, "cargo", "run", "--release")
+	
+	// Set up a restricted environment
+	cmd.Env = []string{
+		"PATH=" + os.Getenv("PATH"),
+		"RUST_BACKTRACE=1",
+	}
+	
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Failed to start Rust application: %v", err)
+		return
 	}
-	err = cmd.Wait()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Rust application started.")
+	
+	go func() {
+		err = cmd.Wait()
+		if err != nil {
+			if ctx.Err() == nil { // Only log if not cancelled
+				log.Printf("Rust application error: %v", err)
+			}
+		}
+	}()
+	
+	// Wait for context cancellation
+	go func() {
+		<-ctx.Done()
+		if cmd.Process != nil {
+			cmd.Process.Signal(os.Interrupt)
+			// Force kill after timeout
+			time.AfterFunc(5*time.Second, func() {
+				cmd.Process.Kill()
+			})
+		}
+	}()
 }
