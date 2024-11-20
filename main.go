@@ -142,25 +142,53 @@ func startHandler(w http.ResponseWriter, r *http.Request) {
 	go startRustApp()
 }
 
+var configMutex sync.Mutex
+
 func updateConfig(address, rpcUrl, chain string, alertBalance int) {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
 	configPath := "AddressAndChain.toml"
-	file, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
+	
+	// Create a TOML structure
+	type Address struct {
+		Address      string `toml:"address"`
+		RpcUrl       string `toml:"rpc_url"`
+		Chain        string `toml:"chain"`
+		AlertBalance int    `toml:"alert_balance"`
 	}
-	defer file.Close()
-
-	_, err = file.WriteString(
-		"[[addresses]]\n" +
-			"address = \"" + address + "\"\n" +
-			"rpc_url = \"" + rpcUrl + "\"\n" +
-			"chain = \"" + chain + "\"\n" +
-			"alert_balance = " + strconv.Itoa(alertBalance) + "\n\n")
+	
+	addresses := []Address{{
+		Address:      address,
+		RpcUrl:       rpcUrl,
+		Chain:        chain,
+		AlertBalance: alertBalance,
+	}}
+	
+	// Marshal to TOML
+	config := map[string]interface{}{
+		"addresses": addresses,
+	}
+	
+	data, err := toml.Marshal(config)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("Error marshaling config: %v", err)
+		return
 	}
 
-	log.Printf("Updated AddressAndChain.toml with address=%s, rpcUrl=%s, chain=%s, alertBalance=%d", address, rpcUrl, chain, alertBalance)
+	// Write atomically
+	tempFile := configPath + ".tmp"
+	err = os.WriteFile(tempFile, data, 0644)
+	if err != nil {
+		log.Printf("Error writing config: %v", err)
+		return
+	}
+	
+	err = os.Rename(tempFile, configPath)
+	if err != nil {
+		log.Printf("Error replacing config: %v", err)
+		return
+	}
 }
 
 func updateEnv(webhookUrl string) {
